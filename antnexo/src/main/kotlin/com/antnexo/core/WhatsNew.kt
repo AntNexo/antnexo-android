@@ -29,6 +29,8 @@ fun unreadCount(published: List<Long>, seen: Long?, now: Long): Int {
     return published.count { it >= since }
 }
 
+private const val MAX_BODY = 1024 * 1024
+
 /** Reads the board's public changelog (no sign-in, nothing personal sent). */
 class ChangelogClient @JvmOverloads constructor(private val host: BoardHost, private val timeoutMs: Int = 15_000) {
     /**
@@ -47,10 +49,22 @@ class ChangelogClient @JvmOverloads constructor(private val host: BoardHost, pri
             c.setRequestProperty("Accept", "application/json")
             val status = c.responseCode
             if (status !in 200..299) throw AntNexoException.Http(status)
-            val body = c.inputStream.use { it.readBytes().toString(Charsets.UTF_8) }
+            val body = c.inputStream.use { readCapped(it) }.toString(Charsets.UTF_8)
             parseDates(body)
         } finally {
             c.disconnect()
+        }
+    }
+
+    /** 20 entries are a few KB; a body past 1 MB isn't the changelog (a misconfigured domain) and isn't read. */
+    private fun readCapped(input: java.io.InputStream): ByteArray {
+        val out = java.io.ByteArrayOutputStream()
+        val buf = ByteArray(16 * 1024)
+        while (true) {
+            val n = input.read(buf)
+            if (n < 0) return out.toByteArray()
+            out.write(buf, 0, n)
+            if (out.size() > MAX_BODY) throw AntNexoException.BadResponse()
         }
     }
 

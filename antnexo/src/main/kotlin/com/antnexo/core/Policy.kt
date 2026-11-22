@@ -7,6 +7,7 @@ import kotlinx.serialization.json.booleanOrNull
 import java.net.URI
 import java.net.URISyntaxException
 import java.util.Calendar
+import java.util.Date
 import java.util.GregorianCalendar
 import java.util.Locale
 import java.util.TimeZone
@@ -77,15 +78,14 @@ private fun JsonObject.int(key: String): Int? {
 internal fun isWebUrl(s: String): Boolean {
     val u = uri(s) ?: return false
     val scheme = u.scheme?.lowercase(Locale.ROOT)
-    return (scheme == "https" || scheme == "http") && !u.host.isNullOrEmpty()
+    return (scheme == "https" || scheme == "http") && authority(u) != null
 }
 
 /** Whether u is the board's own `/api/v1/public/oauth/<provider>/start` (the path compared as sent, still encoded). */
 internal fun isOAuthStart(s: String, host: BoardHost): Boolean {
     val u = uri(s) ?: return false
-    if (u.rawUserInfo != null) return false
-    val h = asciiHost(u.host) ?: return false
-    if (!host.matches(u.scheme ?: return false, h, u.port)) return false
+    val a = authority(u) ?: return false
+    if (a.userInfo || !host.matches(u.scheme ?: return false, a.host, a.port)) return false
     return oauthPath.matches(u.rawPath ?: return false)
 }
 
@@ -105,19 +105,29 @@ fun parseIsoDate(s: String): Long? {
     val m = isoDate.matchEntire(s) ?: return null
     val g = m.groupValues
     val (year, month, day, hour, minute, second) = listOf(g[1], g[2], g[3], g[4], g[5], g[6]).map(String::toInt)
-    if (month !in 1..12 || hour > 23 || minute > 59 || second > 59) return null
-    val c = GregorianCalendar(TimeZone.getTimeZone("UTC"), Locale.ROOT)
-    c.isLenient = false
-    c.clear()
-    c.set(year, month - 1, 1)
-    if (day !in 1..c.getActualMaximum(Calendar.DAY_OF_MONTH)) return null
-    c.set(year, month - 1, day, hour, minute, second)
-    val millis = g[7].padEnd(3, '0').take(3).toInt()
+    if (year < 1 || month !in 1..12 || hour > 23 || minute > 59 || second > 59) return null
     val offset = when (val z = g[8]) {
         "Z", "z" -> 0
-        else -> (if (z[0] == '-') -1 else 1) * (z.substring(1, 3).toInt() * 60 + z.substring(4, 6).toInt())
+        else -> {
+            val oh = z.substring(1, 3).toInt()
+            val om = z.substring(4, 6).toInt()
+            if (oh > 23 || om > 59) return null
+            (if (z[0] == '-') -1 else 1) * (oh * 60 + om)
+        }
     }
-    return c.timeInMillis + millis - offset * 60_000L
+    return try {
+        val c = GregorianCalendar(TimeZone.getTimeZone("UTC"), Locale.ROOT)
+        // proleptic Gregorian, like RFC 3339 (and java.time): no switch to the Julian calendar before 1582
+        c.gregorianChange = Date(Long.MIN_VALUE)
+        c.isLenient = false
+        c.clear()
+        c.set(year, month - 1, 1)
+        if (day !in 1..c.getActualMaximum(Calendar.DAY_OF_MONTH)) return null
+        c.set(year, month - 1, day, hour, minute, second)
+        c.timeInMillis + g[7].padEnd(3, '0').take(3).toInt() - offset * 60_000L
+    } catch (e: IllegalArgumentException) {
+        null
+    }
 }
 
 private operator fun <T> List<T>.component6() = this[5]

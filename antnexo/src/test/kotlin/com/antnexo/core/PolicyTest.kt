@@ -23,6 +23,9 @@ class PolicyTest {
             assertNull(u, p("""{"type":"open","url":"$u"}"""))
         }
         assertNull(p("""{"type":"open"}"""))
+        // hosts java.net.URI reads only as a registry authority still count
+        assertEquals(PageMessage.Open("https://my_site.example.com/"), p("""{"type":"open","url":"https://my_site.example.com/"}"""))
+        assertEquals(PageMessage.Open("https://bücher.example/x"), p("""{"type":"open","url":"https://bücher.example/x"}"""))
         assertNull(p("""{"type":"open","url":3}"""))
     }
 
@@ -43,9 +46,23 @@ class PolicyTest {
             "https://splynx.antnexo.com/api/v1/public/oauth/Google/start",
             "https://u:p@splynx.antnexo.com/api/v1/public/oauth/google/start",
             "https://splynx.antnexo.com/app",
+            "https://feedback_acme.example/api/v1/public/oauth/google/start",
         )) {
             assertNull(u, p("""{"type":"auth","url":"$u"}"""))
         }
+    }
+
+    @Test
+    fun authWorksForABoardOnAnUnusualHost() {
+        val h = BoardHost.parse("https://feedback_acme.example")
+        val u = "https://feedback_acme.example/api/v1/public/oauth/google/start?poll=x"
+        assertEquals(PageMessage.Auth(u), parsePageMessage("""{"type":"auth","url":"$u"}""", h))
+        assertNull(parsePageMessage("""{"type":"auth","url":"https://feedback_acme.example:8443/api/v1/public/oauth/google/start"}""", h))
+        val idn = BoardHost.parse("https://bücher.example")
+        val v = "https://bücher.example/api/v1/public/oauth/github/start"
+        assertEquals(PageMessage.Auth(v), parsePageMessage("""{"type":"auth","url":"$v"}""", idn))
+        val w = "https://xn--bcher-kva.example/api/v1/public/oauth/github/start"
+        assertEquals(PageMessage.Auth(w), parsePageMessage("""{"type":"auth","url":"$w"}""", idn))
     }
 
     @Test
@@ -56,6 +73,7 @@ class PolicyTest {
             p("""{"type":"seen","at":"2026-10-13T14:47:34Z"}"""))
         assertNull(p("""{"type":"seen","at":"yesterday"}"""))
         assertNull(p("""{"type":"seen","at":12}"""))
+        assertNull(p("""{"type":"seen","at":"0000-01-01T00:00:00Z"}"""))
     }
 
     @Test
@@ -123,9 +141,14 @@ class PolicyTest {
         assertEquals(ms("2026-10-13T12:47:34Z"), parseIsoDate("2026-10-13T14:47:34+02:00"))
         assertEquals(ms("2026-10-13T16:17:34Z"), parseIsoDate("2026-10-13T14:47:34-01:30"))
         assertEquals(ms("1970-01-01T00:00:00Z"), parseIsoDate("1970-01-01T00:00:00Z"))
+        // proleptic Gregorian, like Instant: no Julian switch before 1582
+        assertEquals(ms("1000-01-01T00:00:00Z"), parseIsoDate("1000-01-01T00:00:00Z"))
+        assertEquals(ms("0001-01-01T00:00:00Z"), parseIsoDate("0001-01-01T00:00:00Z"))
+        assertNull(parseIsoDate("1500-02-29T00:00:00Z"))
         assertEquals(ms("2024-02-29T23:59:59Z"), parseIsoDate("2024-02-29T23:59:59z"))
         for (bad in listOf("2026-10-13", "", "2026-13-01T00:00:00Z", "2026-02-30T00:00:00Z", "2026-10-13T24:00:00Z",
-            "2026-10-13T14:47:34", "2026-10-13 14:47:34Z", "x2026-10-13T14:47:34Z", "2026-10-13T14:47:34.Z")) {
+            "2026-10-13T14:47:34", "2026-10-13 14:47:34Z", "x2026-10-13T14:47:34Z", "2026-10-13T14:47:34.Z",
+            "0000-01-01T00:00:00Z", "2026-10-13T14:47:34+99:99", "2026-10-13T14:47:34+24:00", "2026-10-13T14:47:34+01:60")) {
             assertNull(bad, parseIsoDate(bad))
         }
     }

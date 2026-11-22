@@ -14,6 +14,9 @@ class LocaleTest {
         assertEquals("en-US", bcp47("en-US-u-ca-japanese"))
         assertEquals("en-US", bcp47("en_US@calendar=japanese"))
         assertEquals("und", bcp47(""))
+        // Locale.toString() shapes with a script or an extension
+        assertEquals("sr-Latn-RS", bcp47("sr_RS_#Latn"))
+        assertEquals("ja-JP-JP", bcp47("ja_JP_JP_#u-ca-japanese"))
         assertTrue(bcp47("a".repeat(8) + "-" + "b".repeat(8) + "-" + "c".repeat(8) + "-" + "d".repeat(8) + "-e").length <= 35)
     }
 }

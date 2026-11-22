@@ -5,7 +5,10 @@ package com.antnexo.core
  * characters (what the API takes); `und` when empty.
  */
 fun bcp47(tag: String): String {
-    val base = tag.substringBefore('@').replace('_', '-')
+    // Locale.toString() puts a script and extensions after "_#" ("sr_RS_#Latn"): the script goes after the language
+    val script = tag.substringAfter("_#", "").substringBefore('-').takeIf { it.length == 4 && it.all(Char::isLetter) }
+    var base = tag.substringBefore("_#").substringBefore('@').replace('_', '-')
+    if (script != null) base = base.substringBefore('-') + "-" + script + base.removePrefix(base.substringBefore('-'))
     // drop extensions and private use: everything from the first singleton subtag on
     val parts = base.split('-').filter { it.isNotEmpty() }.takeWhile { it.length > 1 }
     val out = parts.joinToString("-").take(35).trimEnd('-')

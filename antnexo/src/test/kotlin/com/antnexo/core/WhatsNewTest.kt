@@ -70,6 +70,18 @@ class WhatsNewTest {
     }
 
     @Test
+    fun aDateThatCantBeIsSkipped() = runBlocking {
+        val host = serve(200, """{"items":[{"published_at":"0000-01-01T00:00:00Z"},{"published_at":"2026-10-01T00:00:00Z"}]}""")
+        assertEquals(listOf(Instant.parse("2026-10-01T00:00:00Z").toEpochMilli()), ChangelogClient(host).publishedDates())
+    }
+
+    @Test
+    fun aHugeBodyIsRefused() {
+        val host = serve(200, """{"items":[],"pad":"${"x".repeat(2_000_000)}"}""")
+        assertThrows(AntNexoException.BadResponse::class.java) { runBlocking { ChangelogClient(host).publishedDates() } }
+    }
+
+    @Test
     fun anErrorStatusThrows() {
         val host = serve(500, "{}")
         val e = assertThrows(AntNexoException.Http::class.java) { runBlocking { ChangelogClient(host).publishedDates() } }
@@ -106,5 +118,7 @@ class WhatsNewTest {
         assertEquals(Size(1600, 533), fittedSize(3000, 1000))
         assertEquals(Size(800, 600), fittedSize(800, 600))
         assertEquals(Size(0, 0), fittedSize(0, 0))
+        assertEquals(Size(1, 1600), fittedSize(1, 4000))
+        assertEquals(Size(1600, 1), fittedSize(4000, 1))
     }
 }

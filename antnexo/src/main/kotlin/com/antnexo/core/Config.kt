@@ -71,19 +71,41 @@ class BoardHost private constructor(
             }
             val scheme = u.scheme?.lowercase(Locale.ROOT)
             if (scheme != "https" && scheme != "http") throw AntNexoException.InvalidHost()
-            if (u.rawUserInfo != null || u.rawQuery != null || u.rawFragment != null) throw AntNexoException.InvalidHost()
+            if (u.rawQuery != null || u.rawFragment != null) throw AntNexoException.InvalidHost()
             if (!(u.rawPath.isNullOrEmpty() || u.rawPath == "/")) throw AntNexoException.InvalidHost()
-            val host = asciiHost(u.host ?: hostFromAuthority(u.rawAuthority)) ?: throw AntNexoException.InvalidHost()
-            val port = u.port.takeIf { it > 0 && it != defaultPort(scheme) }
-            return BoardHost(scheme, host, port)
+            val a = authority(u) ?: throw AntNexoException.InvalidHost()
+            if (a.userInfo) throw AntNexoException.InvalidHost()
+            return BoardHost(scheme, a.host, a.port.takeIf { it > 0 && it != defaultPort(scheme) })
         }
 
         internal fun defaultPort(scheme: String) = if (scheme == "https") 443 else 80
-
-        /** java.net.URI leaves host null for non-ASCII names: take it from the authority. */
-        private fun hostFromAuthority(authority: String?): String? =
-            authority?.substringAfterLast('@')?.substringBefore(':')?.takeIf { it.isNotEmpty() }
     }
+}
+
+/** A URL's host (ASCII, lowercase) and port (-1: none), and whether it carries user info. */
+internal class Authority(val host: String, val port: Int, val userInfo: Boolean)
+
+/**
+ * The host and port of u. java.net.URI reads a host it doesn't like (non-ASCII, an underscore, a bad port) as a
+ * "registry" authority with no host and no port: then they come from the raw authority, so the port is never lost.
+ * null: no host, or a port that isn't 1…65535.
+ */
+internal fun authority(u: URI): Authority? {
+    if (u.host != null) {
+        val host = asciiHost(u.host) ?: return null
+        if (u.port == 0 || u.port > 65535) return null
+        return Authority(host, u.port, u.rawUserInfo != null)
+    }
+    val raw = u.rawAuthority ?: return null
+    val userInfo = raw.contains('@')
+    val hostPort = raw.substringAfterLast('@')
+    val colon = hostPort.lastIndexOf(':')
+    val host = asciiHost(if (colon >= 0) hostPort.substring(0, colon) else hostPort) ?: return null
+    val port = if (colon < 0) -1 else hostPort.substring(colon + 1).let { p ->
+        if (p.isEmpty() || p.length > 5 || !p.all { it in '0'..'9' }) return null
+        p.toInt().takeIf { it in 1..65535 } ?: return null
+    }
+    return Authority(host, port, userInfo)
 }
 
 /** A host name in ASCII (`xn--bcher-kva.example`), lowercase; null when it has none or can't be converted. */

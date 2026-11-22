@@ -25,6 +25,10 @@ class ConfigTest {
     fun hostsAreAsciiAndLowercase() {
         assertEquals("xn--bcher-kva.example", BoardHost.parse("https://BÜCHER.example").host)
         assertEquals("splynx.antnexo.com", BoardHost.parse("https://SPLYNX.antnexo.com").host)
+        // java.net.URI reads these only as a registry authority: the port must survive
+        assertEquals("https://xn--bcher-kva.example:8443", BoardHost.parse("https://bücher.example:8443").origin)
+        assertEquals("https://feedback_acme.example:8443", BoardHost.parse("https://feedback_acme.example:8443").origin)
+        assertEquals("https://feedback_acme.example", BoardHost.parse("https://feedback_acme.example:443").origin)
         assertTrue(splynx.isAntNexoSubdomain)
         assertFalse(BoardHost.parse("https://feedback.acme.com").isAntNexoSubdomain)
     }
@@ -33,7 +37,8 @@ class ConfigTest {
     fun refusesAnythingButABareOrigin() {
         for (bad in listOf(
             "ftp://x", "https://x.com/path", "https://x.com?q=1", "https://x.com#f", "https://u:p@x.com", "",
-            "splynx.antnexo.com", "https://",
+            "splynx.antnexo.com", "https://", "https://a.com:abc", "https://a.com:99999", "https://a.com:0",
+            "https://bücher.example:x", "https://bücher.example:70000",
         )) {
             assertThrows(bad, AntNexoException.InvalidHost::class.java) { BoardHost.parse(bad) }
         }
