@@ -51,6 +51,18 @@ class BridgeTest {
     }
 
     @Test
+    fun aWipeClearsTheOriginsStorageOncePerLogout() {
+        val s = bridgeScript(NativeState(BridgePlatform.ANDROID, ctx, wipe = "n0nce"))
+        // once: a reload, a rebuilt WebView or a same-origin frame of the same opening finds the marker and keeps the
+        // new person's session
+        assertTrue(s.startsWith("try{if(localStorage.getItem(\"antnexo:wiped\")!==\"n0nce\"){localStorage.clear();" +
+            "sessionStorage.clear();localStorage.setItem(\"antnexo:wiped\",\"n0nce\")}}catch(e){}window.AntNexoApp="))
+        assertFalse(bridgeScript(NativeState(BridgePlatform.ANDROID, ctx)).contains("clear()"))
+        // the nonce is ours, but it still goes through JSON
+        assertFalse(bridgeScript(NativeState(BridgePlatform.ANDROID, ctx, wipe = "a\"</script>")).contains("</script>"))
+    }
+
+    @Test
     fun stateToStringRedactsSecrets() {
         val s = NativeState(BridgePlatform.ANDROID, ctx, identify = "secret-jwt", screenshot = "data:image/jpeg;base64,QUJD")
         val text = s.toString()

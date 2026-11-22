@@ -75,10 +75,22 @@ class BoardHost private constructor(
             if (!(u.rawPath.isNullOrEmpty() || u.rawPath == "/")) throw AntNexoException.InvalidHost()
             val a = authority(u) ?: throw AntNexoException.InvalidHost()
             if (a.userInfo) throw AntNexoException.InvalidHost()
+            // the page gets the person's identify token and maybe a screenshot: plain http only on this machine
+            if (scheme == "http" && !isLocal(a.host)) throw AntNexoException.InvalidHost()
             return BoardHost(scheme, a.host, a.port.takeIf { it > 0 && it != defaultPort(scheme) })
         }
 
         internal fun defaultPort(scheme: String) = if (scheme == "https") 443 else 80
+
+        private val loopback4 = Regex("^127\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}$")
+
+        /**
+         * A host for local development: this machine (localhost, *.localhost, 127/8, ::1), or the host machine as an
+         * emulator sees it (Android emulator 10.0.2.2, Genymotion 10.0.3.2).
+         */
+        private fun isLocal(host: String) =
+            host == "localhost" || host.endsWith(".localhost") || loopback4.matches(host) || host == "[::1]" ||
+                host == "::1" || host == "10.0.2.2" || host == "10.0.3.2"
     }
 }
 

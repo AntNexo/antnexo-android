@@ -44,7 +44,7 @@ jobs:
           packages: platform-tools
       - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
       - name: Tests, lint and builds
-        run: ./gradlew :antnexo:testDebugUnitTest :antnexo:lintDebug :antnexo:assembleRelease --console=plain
+        run: ./gradlew :antnexo:testDebugUnitTest :antnexo:lintDebug :antnexo:assembleRelease :antnexo-compose:lintDebug :antnexo-compose:assembleRelease --console=plain
       - if: github.event_name == 'push' && github.ref_name == 'main' && steps.cache.outputs.cache-hit != 'true'
         run: ./gradlew --stop
       - if: github.event_name == 'push' && github.ref_name == 'main' && steps.cache.outputs.cache-hit != 'true'

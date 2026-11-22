@@ -29,10 +29,12 @@ class NativeState(
     val seen: String? = null,
     /** The app's screen as a `data:image/jpeg;base64,…` URL, when the app asked for one. */
     val screenshot: String? = null,
+    /** The logout's nonce: clear the board origin's storage once before the page runs (the opening after a logout). */
+    val wipe: String? = null,
 ) {
     override fun toString() =
         "NativeState(platform=$platform, context=$context, identify=${identify?.let { "<redacted>" }}, seen=$seen, " +
-            "screenshot=${screenshot?.let { "<${it.length} chars>" }})"
+            "screenshot=${screenshot?.let { "<${it.length} chars>" }}, wipe=${wipe != null})"
 }
 
 /**
@@ -60,7 +62,18 @@ fun bridgeScript(s: NativeState, listener: String = "antnexoNative"): String {
         put("seen", s.seen?.let(::JsonPrimitive) ?: JsonNull)
         put("screenshot", s.screenshot?.let(::JsonPrimitive) ?: JsonNull)
     }.toString()
-    val safe = json.replace("<", "\\u003c").replace("\u2028", "\\u2028").replace("\u2029", "\\u2029")
-    return "window.AntNexoApp=(function(){var n=window.$listener;var a=$safe;a.context=Object.freeze(a.context);" +
+    val safe = escapeForScript(json)
+    // The widget keeps its session in localStorage, which WebStorage.deleteOrigin doesn't clear (WebView 133). Once per
+    // logout: the marker keeps a reload, a rebuilt WebView or a same-origin frame from signing the new person out.
+    val wipe = s.wipe?.let { nonce ->
+        val n = escapeForScript(JsonPrimitive(nonce).toString())
+        "try{if(localStorage.getItem(\"antnexo:wiped\")!==$n){localStorage.clear();sessionStorage.clear();" +
+            "localStorage.setItem(\"antnexo:wiped\",$n)}}catch(e){}"
+    } ?: ""
+    return wipe + "window.AntNexoApp=(function(){var n=window.$listener;var a=$safe;a.context=Object.freeze(a.context);" +
         "a.post=function(m){n.postMessage(JSON.stringify(m))};return Object.freeze(a)})();"
 }
+
+/** JSON made safe inside a script: no `<` (no `</script>`), no raw U+2028/U+2029. */
+private fun escapeForScript(json: String) =
+    json.replace("<", "\\u003c").replace("\u2028", "\\u2028").replace("\u2029", "\\u2029")

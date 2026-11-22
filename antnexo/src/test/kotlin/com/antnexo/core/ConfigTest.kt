@@ -45,6 +45,19 @@ class ConfigTest {
     }
 
     @Test
+    fun plainHttpOnlyForThisMachineOrTheEmulatorsHost() {
+        for (ok in listOf("http://acme.localhost:8090", "http://localhost:8090", "http://127.0.0.1:8090", "http://127.1.2.3:8090",
+            "http://[::1]:8090", "http://10.0.2.2:8090", "http://10.0.3.2:8090")) {
+            BoardHost.parse(ok)
+        }
+        // the identify token and the screenshot must never go to a plaintext page on the network
+        for (bad in listOf("http://splynx.antnexo.com", "http://feedback.acme.com", "http://192.168.1.10:8090", "http://localhost.evil.io",
+            "http://127.0.0.1.evil.io", "http://10.0.2.3")) {
+            assertThrows(bad, AntNexoException.InvalidHost::class.java) { BoardHost.parse(bad) }
+        }
+    }
+
+    @Test
     fun matchesOnlyTheExactOrigin() {
         assertTrue(splynx.matches("https", "splynx.antnexo.com", -1))
         assertTrue(splynx.matches("https", "splynx.antnexo.com", 0))
