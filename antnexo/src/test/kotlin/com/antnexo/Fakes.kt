@@ -74,5 +74,5 @@ internal class TestSession(
         host = splynx, workspace = "splynx", page = splynxPage, state = testState, options = options, seenStore = seen,
         onEvent = { events += it }, onEnded = { ended++ },
         deps = SessionDeps(bridge = bridge, opener = { opener }, signIn = { signIn }),
-    )
+    ).also { it.resumed = true }
 }

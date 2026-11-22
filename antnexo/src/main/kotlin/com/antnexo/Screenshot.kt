@@ -8,6 +8,7 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Base64
 import android.view.PixelCopy
+import android.view.WindowManager
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.scale
 import com.antnexo.core.fittedSize
@@ -38,7 +39,10 @@ internal fun jpegDataUrl(bitmap: Bitmap, max: Int = 1600): String? {
 internal fun captureScreenshot(activity: Activity, done: (String?) -> Unit) {
     val main = Handler(Looper.getMainLooper())
     try {
-        val decor = activity.window?.decorView
+        val window = activity.window ?: return done(null)
+        // the app marked this screen as not to be captured (banking, passwords): never send it
+        if (window.attributes.flags and WindowManager.LayoutParams.FLAG_SECURE != 0) return done(null)
+        val decor = window.decorView
         if (decor == null || decor.width <= 0 || decor.height <= 0) return done(null)
         val bitmap = createBitmap(decor.width, decor.height)
         if (Build.VERSION.SDK_INT >= 26) {

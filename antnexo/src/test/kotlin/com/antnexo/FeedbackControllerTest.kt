@@ -19,7 +19,7 @@ import org.robolectric.Shadows.shadowOf
 class FeedbackControllerTest {
     private val t = TestSession()
     private val js = mutableListOf<String>()
-    private val c = FeedbackController(t.session).also { it.runJs = { s -> js += s } }
+    private val c = FeedbackController(t.session).also { it.evaluate = { s -> js += s } }
     private var failed = 0
     private var loaded = 0
 
@@ -48,11 +48,14 @@ class FeedbackControllerTest {
         val auth = "https://splynx.antnexo.com/api/v1/public/oauth/google/start?poll=x"
         c.handle(PageMessage.Auth(auth))
         assertEquals(listOf(auth), t.signIn.started)
-        t.signIn.onClosed!!()
-        assertEquals(listOf("window.dispatchEvent(new CustomEvent('antnexo:native',{detail:{type:'auth_closed'}}))"), js)
-
+        // signed in: the sign-in tab closes, no auth_closed
         c.handle(PageMessage.Session(true))
         assertEquals(1, t.signIn.finished)
+        assertTrue(js.isEmpty())
+        // the person closes the next one themselves: the page hears it
+        c.handle(PageMessage.Auth(auth))
+        t.signIn.onClosed!!()
+        assertEquals(listOf("window.dispatchEvent(new CustomEvent('antnexo:native',{detail:{type:'auth_closed'}}))"), js)
         c.handle(PageMessage.Seen(0, "2026-11-01T00:00:00Z"))
         assertEquals("2026-11-01T00:00:00Z", t.seen.get("splynx"))
         c.handle(PageMessage.Unread(4))

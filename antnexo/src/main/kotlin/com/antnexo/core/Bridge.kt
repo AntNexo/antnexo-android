@@ -29,10 +29,12 @@ class NativeState(
     val seen: String? = null,
     /** The app's screen as a `data:image/jpeg;base64,…` URL, when the app asked for one. */
     val screenshot: String? = null,
+    /** Clear the board origin's storage before the page runs (the first opening after a logout). */
+    val wipe: Boolean = false,
 ) {
     override fun toString() =
         "NativeState(platform=$platform, context=$context, identify=${identify?.let { "<redacted>" }}, seen=$seen, " +
-            "screenshot=${screenshot?.let { "<${it.length} chars>" }})"
+            "screenshot=${screenshot?.let { "<${it.length} chars>" }}, wipe=$wipe)"
 }
 
 /**
@@ -61,6 +63,8 @@ fun bridgeScript(s: NativeState, listener: String = "antnexoNative"): String {
         put("screenshot", s.screenshot?.let(::JsonPrimitive) ?: JsonNull)
     }.toString()
     val safe = json.replace("<", "\\u003c").replace("\u2028", "\\u2028").replace("\u2029", "\\u2029")
-    return "window.AntNexoApp=(function(){var n=window.$listener;var a=$safe;a.context=Object.freeze(a.context);" +
+    // the widget keeps its session in localStorage, which WebStorage.deleteOrigin doesn't clear (WebView 133)
+    val wipe = if (s.wipe) "try{localStorage.clear();sessionStorage.clear()}catch(e){}" else ""
+    return wipe + "window.AntNexoApp=(function(){var n=window.$listener;var a=$safe;a.context=Object.freeze(a.context);" +
         "a.post=function(m){n.postMessage(JSON.stringify(m))};return Object.freeze(a)})();"
 }

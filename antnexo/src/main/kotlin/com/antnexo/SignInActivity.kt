@@ -3,6 +3,7 @@ package com.antnexo
 import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
+import com.antnexo.core.isOAuthStart
 
 /**
  * Hosts the provider sign-in Custom Tab in the app's task (the AppAuth pattern). It opens the tab on its first resume;
@@ -37,7 +38,9 @@ class SignInActivity : Activity() {
         if (!launched) {
             launched = true
             val url = intent.getStringExtra(EXTRA_URL)
-            if (url == null || !openInBrowser(this, url)) closed()
+            // checked again here: only the open sheet's own OAuth start URL, whoever started this activity
+            val host = Sessions.current?.host
+            if (url == null || host == null || !isOAuthStart(url, host) || !openInBrowser(this, url)) closed()
             return
         }
         closed()

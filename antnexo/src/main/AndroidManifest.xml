@@ -4,10 +4,11 @@
     <uses-permission android:name="android.permission.INTERNET" />
 
     <application>
-        <!-- configChanges: rotating or resizing must not reload the page (and lose what the person typed) -->
+        <!-- configChanges: rotating, resizing or switching dark mode must not reload the page (and lose what the person
+             typed) -->
         <activity
             android:name="com.antnexo.FeedbackActivity"
-            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|density"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|density|uiMode"
             android:exported="false"
             android:theme="@style/AntNexo.Sheet"
             android:windowSoftInputMode="adjustResize" />

@@ -39,8 +39,17 @@ internal class FeedbackController(private val session: Session) {
     var outdatedWebView = false
         private set
 
-    /** Runs JS in the page (tests replace it). */
-    var runJs: (String) -> Unit = { js -> web?.evaluateJavascript(js, null) }
+    /** The renderer died: this WebView can't be used again; Try again needs a new one. */
+    var rendererGone = false
+        private set
+
+    /** Runs JS in the WebView (tests replace it). */
+    var evaluate: (String) -> Unit = { js -> web?.evaluateJavascript(js, null) }
+
+    /** Runs JS in the page, unless the page is gone. */
+    fun runJs(js: String) {
+        if (!torn && !rendererGone) evaluate(js)
+    }
 
     /** The page didn't load (offline, refused, an error status, the renderer died): the retry view. */
     var onLoadFailed: (() -> Unit)? = null
@@ -127,12 +136,23 @@ internal class FeedbackController(private val session: Session) {
     fun handle(m: PageMessage) {
         when (m) {
             PageMessage.Ready -> Unit
-            is PageMessage.Open -> opener.open(m.url)
-            is PageMessage.Auth -> signIn.start(m.url) { runJs(AUTH_CLOSED) }
+            // only while the person is looking at the sheet: a page can't launch things behind their back
+            is PageMessage.Open -> if (session.resumed) opener.open(m.url)
+            is PageMessage.Auth -> if (session.resumed && !session.signingIn) {
+                session.signingIn = true
+                signIn.start(m.url) {
+                    session.signingIn = false
+                    // the page that is current now (the activity may have been recreated meanwhile)
+                    (session.controller ?: this).runJs(AUTH_CLOSED)
+                }
+            }
             is PageMessage.Seen -> session.seenStore.set(m.raw, session.workspace)
             is PageMessage.Unread -> session.onEvent(AntNexoEvent.Unread(m.count))
             is PageMessage.Session -> {
-                if (m.signedIn) signIn.finish()
+                if (m.signedIn && session.signingIn) {
+                    session.signingIn = false
+                    signIn.finish()
+                }
                 session.onEvent(AntNexoEvent.SignedIn(m.signedIn))
             }
             is PageMessage.IdentifyFailed -> session.onEvent(AntNexoEvent.IdentifyFailed(m.code))
@@ -149,7 +169,7 @@ internal class FeedbackController(private val session: Session) {
             return false
         }
         if (mainFrame && hasGesture && !isRedirect && isWebUrl(url)) {
-            opener.open(url)
+            if (session.resumed) opener.open(url)
         } else if (mainFrame && !finished) {
             fail()
         }
@@ -159,6 +179,7 @@ internal class FeedbackController(private val session: Session) {
     fun pageFinished() {
         if (failed || torn) return
         finished = true
+        session.wiped()
         onLoaded?.invoke()
     }
 
@@ -173,6 +194,7 @@ internal class FeedbackController(private val session: Session) {
     /** The renderer crashed or was killed: this WebView is dead; true tells the system the app handled it. */
     fun renderProcessGone(): Boolean {
         Log.w(TAG, "the WebView's renderer went away")
+        rendererGone = true
         fail()
         return true
     }

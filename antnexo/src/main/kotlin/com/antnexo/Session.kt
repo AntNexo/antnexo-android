@@ -47,12 +47,25 @@ internal class Session(
     /** The sheet is gone: the next show() may open one. */
     val onEnded: () -> Unit,
     val deps: SessionDeps = SessionDeps(),
+    /** A page loaded with state.wipe: the logout's wipe is done. */
+    val onWiped: () -> Unit = {},
 ) {
     /** The controller of the live activity, if any. */
     var controller: FeedbackController? = null
     var activity: WeakReference<Activity>? = null
+
+    /** The sheet is in front (resumed): only then may the page open links or a sign-in. */
+    var resumed = false
+
+    /** A sign-in tab is open: one at a time. */
+    var signingIn = false
     var ended = false
         private set
+
+    /** A page carrying the wipe loaded: later openings needn't wipe again. */
+    fun wiped() {
+        if (state.wipe) onWiped()
+    }
 
     /** Ends the session once: the page stops, the app hears Closed. */
     fun end() {
@@ -60,6 +73,8 @@ internal class Session(
         ended = true
         controller?.tearDown()
         controller = null
+        // a sign-in tab left open must not call into this (gone) page
+        SignInActivity.pending = null
         if (Sessions.current === this) Sessions.current = null
         onEnded()
         onEvent(AntNexoEvent.Closed)

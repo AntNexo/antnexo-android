@@ -62,15 +62,36 @@ object AntNexo {
         engine.show(activity, tab, screenshot, onClosed)
     }
 
-    /** Closes the sheet if one is open (main thread). */
+    /** Also told what happens in the sheet, besides [onEvent] (main thread). */
+    @JvmStatic
+    fun addEventListener(listener: (AntNexoEvent) -> Unit) {
+        engine.listeners += listener
+    }
+
+    @JvmStatic
+    fun removeEventListener(listener: (AntNexoEvent) -> Unit) {
+        engine.listeners -= listener
+    }
+
+    /** Closes the sheet if one is open, or drops one still being prepared. */
     @JvmStatic
     fun close() {
         engine.close()
     }
 
-    /** What's new: how many entries the person hasn't seen (for a badge on your own button). */
+    /**
+     * What's new: how many entries the person hasn't seen (for a badge on your own button).
+     *
+     * @throws com.antnexo.core.AntNexoException.NotConfigured before [configure]
+     * @throws com.antnexo.core.AntNexoException.Http or [com.antnexo.core.AntNexoException.BadResponse] when the board
+     *   answers wrongly
+     * @throws java.io.IOException when the network fails
+     */
     suspend fun unreadCount(): Int = engine.unreadCount()
 
-    /** Signs the person out of the sheet: closes it and clears its web data. Call it on every account switch. */
+    /**
+     * Signs the person out of the sheet: closes it (or drops one still opening) and clears the board's web data before
+     * the next opening. Call it on every account switch, after [identify] stops returning the old person's token.
+     */
     suspend fun logout() = withContext(Dispatchers.Main.immediate) { engine.logout() }
 }

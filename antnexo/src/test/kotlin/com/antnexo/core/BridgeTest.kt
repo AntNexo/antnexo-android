@@ -51,6 +51,13 @@ class BridgeTest {
     }
 
     @Test
+    fun aWipeClearsTheOriginsStorageBeforeThePageRuns() {
+        val s = bridgeScript(NativeState(BridgePlatform.ANDROID, ctx, wipe = true))
+        assertTrue(s.startsWith("try{localStorage.clear();sessionStorage.clear()}catch(e){}window.AntNexoApp="))
+        assertFalse(bridgeScript(NativeState(BridgePlatform.ANDROID, ctx)).contains("clear()"))
+    }
+
+    @Test
     fun stateToStringRedactsSecrets() {
         val s = NativeState(BridgePlatform.ANDROID, ctx, identify = "secret-jwt", screenshot = "data:image/jpeg;base64,QUJD")
         val text = s.toString()
