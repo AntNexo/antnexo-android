@@ -13,12 +13,20 @@ class BridgeTest {
     fun scriptCarriesTheContract() {
         val s = bridgeScript(NativeState(BridgePlatform.ANDROID, ctx))
         assertTrue(s.startsWith("window.AntNexoApp="))
-        for (part in listOf("\"v\":1", "\"platform\":\"android\"", "\"sdk\":\"1.0.0\"", "\"app_version\":\"2.3.0\"",
+        for (part in listOf("\"v\":1", "\"platform\":\"android\"", "\"sdk\":\"$SDK_VERSION\"", "\"app_version\":\"2.3.0\"",
             "\"app_build\":\"45\"", "\"os_version\":\"16\"", "\"identify\":null", "\"seen\":null", "\"screenshot\":null")) {
             assertTrue(part, s.contains(part))
         }
         assertTrue(s.contains("Object.freeze(a.context)"))
         assertTrue(s.contains("return Object.freeze(a)"))
+    }
+
+    @Test
+    fun aWrapperSetsPlatformAndSdk() {
+        val s = bridgeScript(NativeState(BridgePlatform.REACT_NATIVE, ctx, sdk = "9.9.9"))
+        assertTrue(s, s.contains("\"platform\":\"react-native\""))
+        assertTrue(s, s.contains("\"sdk\":\"9.9.9\""))
+        assertEquals(SDK_VERSION, NativeState(BridgePlatform.ANDROID, ctx).sdk)
     }
 
     @Test

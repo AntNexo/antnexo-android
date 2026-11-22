@@ -7,6 +7,8 @@ import androidx.test.core.app.ApplicationProvider
 import com.antnexo.core.AntNexoException
 import com.antnexo.core.AppContext
 import com.antnexo.core.BoardHost
+import com.antnexo.core.BridgePlatform
+import com.antnexo.core.SDK_VERSION
 import com.antnexo.core.FeedbackTab
 import com.antnexo.core.unreadCount
 import kotlinx.coroutines.delay
@@ -65,6 +67,19 @@ class EngineTest {
     fun configureValidates() {
         assertThrows(AntNexoException.InvalidWorkspace::class.java) { e.configure(app, "https://splynx.antnexo.com", "  ") }
         assertThrows(AntNexoException.InvalidHost::class.java) { e.configure(app, "splynx.antnexo.com", "splynx") }
+    }
+
+    @Test
+    fun aWrapperSetsPlatformAndSdk() = runBlocking {
+        configure()
+        val first = e.prepare(activity, null, screenshot = false)!!
+        assertEquals(BridgePlatform.ANDROID, first.state.platform)
+        assertEquals(SDK_VERSION, first.state.sdk)
+        first.onEnded()
+        e.wrapper = BridgePlatform.REACT_NATIVE to "9.9.9"
+        val s = e.prepare(activity, null, screenshot = false)!!
+        assertEquals(BridgePlatform.REACT_NATIVE, s.state.platform)
+        assertEquals("9.9.9", s.state.sdk)
     }
 
     @Test

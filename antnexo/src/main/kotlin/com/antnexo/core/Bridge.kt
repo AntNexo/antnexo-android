@@ -5,8 +5,8 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-/** The platform the page is told it runs on (`AntNexoApp.platform`). */
-enum class BridgePlatform(val value: String) { ANDROID("android") }
+/** The platform the page is told it runs on (`AntNexoApp.platform`). `REACT_NATIVE` is set by the React Native wrapper. */
+enum class BridgePlatform(val value: String) { ANDROID("android"), REACT_NATIVE("react-native") }
 
 /** The app's context the page sends with each post. Every field is optional; null fields are left out. */
 data class AppContext(
@@ -31,10 +31,12 @@ class NativeState(
     val screenshot: String? = null,
     /** The logout's nonce: clear the board origin's storage once before the page runs (the opening after a logout). */
     val wipe: String? = null,
+    /** The SDK version the page reports: this library's, or a wrapper's (React Native). */
+    val sdk: String = SDK_VERSION,
 ) {
     override fun toString() =
         "NativeState(platform=$platform, context=$context, identify=${identify?.let { "<redacted>" }}, seen=$seen, " +
-            "screenshot=${screenshot?.let { "<${it.length} chars>" }}, wipe=${wipe != null})"
+            "screenshot=${screenshot?.let { "<${it.length} chars>" }}, wipe=${wipe != null}, sdk=$sdk)"
 }
 
 /**
@@ -47,7 +49,7 @@ fun bridgeScript(s: NativeState, listener: String = "antnexoNative"): String {
     val json = buildJsonObject {
         put("v", 1)
         put("platform", s.platform.value)
-        put("sdk", SDK_VERSION)
+        put("sdk", s.sdk)
         put("context", buildJsonObject {
             c.app?.let { put("app", it) }
             c.appVersion?.let { put("app_version", it) }
