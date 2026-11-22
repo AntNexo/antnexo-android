@@ -33,9 +33,9 @@ and in your app's `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("com.github.AntNexo.antnexo-android:antnexo-android-compose:v1.1.0") // Compose (includes the core)
+    implementation("com.github.AntNexo.antnexo-android:antnexo-android-compose:v1.2.0") // Compose (includes the core)
     // or, for Views only:
-    implementation("com.github.AntNexo.antnexo-android:antnexo-android:v1.1.0")
+    implementation("com.github.AntNexo.antnexo-android:antnexo-android:v1.2.0")
 }
 ```
 

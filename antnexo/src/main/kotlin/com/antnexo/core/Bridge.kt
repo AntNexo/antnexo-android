@@ -5,8 +5,8 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-/** The platform the page is told it runs on (`AntNexoApp.platform`). `REACT_NATIVE` is set by the React Native wrapper. */
-enum class BridgePlatform(val value: String) { ANDROID("android"), REACT_NATIVE("react-native") }
+/** The platform the page is told it runs on (`AntNexoApp.platform`). `REACT_NATIVE` and `FLUTTER` are set by the wrappers. */
+enum class BridgePlatform(val value: String) { ANDROID("android"), REACT_NATIVE("react-native"), FLUTTER("flutter") }
 
 /** The app's context the page sends with each post. Every field is optional; null fields are left out. */
 data class AppContext(
