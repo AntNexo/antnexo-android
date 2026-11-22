@@ -244,12 +244,14 @@ class FeedbackActivity : ComponentActivity() {
             isClickable = true
             setPadding(dp(32), 0, dp(32), 0)
         }
+        // wrap_content: a vertical LinearLayout's children default to its full width, which left-aligns their text
+        val wrap = { LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT) }
         box.addView(TextView(this).apply {
             text = getString(if (outdated) R.string.antnexo_outdated_webview else R.string.antnexo_load_failed)
             setTextColor(colors.secondary)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
             gravity = Gravity.CENTER
-        })
+        }, wrap())
         if (!outdated) {
             box.addView(TextView(this).apply {
                 text = getString(R.string.antnexo_try_again)
@@ -257,9 +259,11 @@ class FeedbackActivity : ComponentActivity() {
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
                 typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
                 setPadding(dp(16), dp(12), dp(16), dp(12))
+                minimumHeight = dp(48)
+                gravity = Gravity.CENTER
                 isClickable = true
                 setOnClickListener { retry() }
-            })
+            }, wrap())
         }
         content?.addView(box, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
         failureView = box

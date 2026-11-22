@@ -104,6 +104,21 @@ class FeedbackActivityTest {
     }
 
     @Test
+    fun tryAgainIsCentred() {
+        val a = open().get()
+        t.session.controller!!.httpError(mainFrame = true, status = 500)
+        val box = a.failureView as android.widget.LinearLayout
+        assertEquals(2, box.childCount)
+        assertEquals(android.view.Gravity.CENTER, box.gravity)
+        // a full 48dp touch target
+        assertTrue(box.getChildAt(1).minimumHeight >= (48 * a.resources.displayMetrics.density).toInt())
+        for (i in 0 until box.childCount) {
+            val v = box.getChildAt(i)
+            assertEquals(android.view.ViewGroup.LayoutParams.WRAP_CONTENT, v.layoutParams.width)
+        }
+    }
+
+    @Test
     fun anOutdatedWebViewSaysSo() {
         t.bridge.isSupported = false
         val a = open().get()

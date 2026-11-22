@@ -1,0 +1,4 @@
+jdk:
+  - openjdk21
+install:
+  - ./gradlew :antnexo:publishToMavenLocal :antnexo-compose:publishToMavenLocal
