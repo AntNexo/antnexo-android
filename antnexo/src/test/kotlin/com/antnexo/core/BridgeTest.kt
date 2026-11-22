@@ -27,6 +27,7 @@ class BridgeTest {
         assertTrue(s, s.contains("\"platform\":\"react-native\""))
         assertTrue(s, s.contains("\"sdk\":\"9.9.9\""))
         assertEquals(SDK_VERSION, NativeState(BridgePlatform.ANDROID, ctx).sdk)
+        assertTrue(bridgeScript(NativeState(BridgePlatform.FLUTTER, ctx)).contains("\"platform\":\"flutter\""))
     }
 
     @Test
