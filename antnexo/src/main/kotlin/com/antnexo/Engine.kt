@@ -70,7 +70,11 @@ internal class Engine {
     var onEvent: ((AntNexoEvent) -> Unit)? = null
     var identifyTimeoutMs = 10_000L
 
-    /** Set by a wrapper (React Native): the platform and SDK version the page reports instead of this library's. */
+    /**
+     * Set by a wrapper (React Native): the platform and SDK version the page reports instead of this library's.
+     * Volatile: a wrapper sets it from its own thread (React Native's module thread).
+     */
+    @Volatile
     var wrapper: Pair<BridgePlatform, String>? = null
 
     /** How long FeedbackActivity has to attach before the sheet counts as never opened (a blocked start). */

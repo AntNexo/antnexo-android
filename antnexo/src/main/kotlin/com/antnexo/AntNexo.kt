@@ -21,6 +21,7 @@ object AntNexo {
 
     /**
      * For wrappers of this library (the React Native SDK): the platform and SDK version the page reports. Not for apps.
+     * Any thread; call it before the first `show`.
      */
     @AntNexoWrapperApi
     @JvmStatic
