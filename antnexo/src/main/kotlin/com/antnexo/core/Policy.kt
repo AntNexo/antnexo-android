@@ -6,10 +6,10 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.booleanOrNull
 import java.net.URI
 import java.net.URISyntaxException
-import java.time.Instant
-import java.time.OffsetDateTime
-import java.time.format.DateTimeParseException
+import java.util.Calendar
+import java.util.GregorianCalendar
 import java.util.Locale
+import java.util.TimeZone
 
 /** A message from the page (`AntNexoApp.post`), after validation. Anything else is ignored. */
 sealed interface PageMessage {
@@ -22,7 +22,7 @@ sealed interface PageMessage {
     data class Auth(val url: String) : PageMessage
 
     /** The person saw What's new up to this entry. */
-    data class Seen(val at: Instant, val raw: String) : PageMessage
+    data class Seen(val atMillis: Long, val raw: String) : PageMessage
 
     data class Unread(val count: Int) : PageMessage
 
@@ -95,12 +95,32 @@ private fun uri(s: String): URI? = try {
     null
 }
 
-/** An ISO 8601 date-time with an offset, with or without fractional seconds. */
-fun parseIsoDate(s: String): Instant? = try {
-    OffsetDateTime.parse(s).toInstant()
-} catch (e: DateTimeParseException) {
-    null
+private val isoDate = Regex("^(\\d{4})-(\\d{2})-(\\d{2})T(\\d{2}):(\\d{2}):(\\d{2})(?:\\.(\\d{1,9}))?(Z|z|[+-]\\d{2}:\\d{2})$")
+
+/**
+ * An RFC 3339 date-time (`2026-10-13T14:47:34.251324Z`, `…+02:00`) as epoch milliseconds (fractions past
+ * milliseconds dropped); null when it isn't one or names a day that doesn't exist. No java.time: it needs API 26.
+ */
+fun parseIsoDate(s: String): Long? {
+    val m = isoDate.matchEntire(s) ?: return null
+    val g = m.groupValues
+    val (year, month, day, hour, minute, second) = listOf(g[1], g[2], g[3], g[4], g[5], g[6]).map(String::toInt)
+    if (month !in 1..12 || hour > 23 || minute > 59 || second > 59) return null
+    val c = GregorianCalendar(TimeZone.getTimeZone("UTC"), Locale.ROOT)
+    c.isLenient = false
+    c.clear()
+    c.set(year, month - 1, 1)
+    if (day !in 1..c.getActualMaximum(Calendar.DAY_OF_MONTH)) return null
+    c.set(year, month - 1, day, hour, minute, second)
+    val millis = g[7].padEnd(3, '0').take(3).toInt()
+    val offset = when (val z = g[8]) {
+        "Z", "z" -> 0
+        else -> (if (z[0] == '-') -1 else 1) * (z.substring(1, 3).toInt() * 60 + z.substring(4, 6).toInt())
+    }
+    return c.timeInMillis + millis - offset * 60_000L
 }
+
+private operator fun <T> List<T>.component6() = this[5]
 
 /**
  * Lets through only the first load of the app page in the main frame: every later navigation (a link, a redirect, a

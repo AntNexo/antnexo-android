@@ -50,9 +50,9 @@ class PolicyTest {
 
     @Test
     fun seenNeedsADate() {
-        assertEquals(PageMessage.Seen(Instant.parse("2026-10-13T14:47:34.251324Z"), "2026-10-13T14:47:34.251324Z"),
+        assertEquals(PageMessage.Seen(Instant.parse("2026-10-13T14:47:34.251Z").toEpochMilli(), "2026-10-13T14:47:34.251324Z"),
             p("""{"type":"seen","at":"2026-10-13T14:47:34.251324Z"}"""))
-        assertEquals(PageMessage.Seen(Instant.parse("2026-10-13T14:47:34Z"), "2026-10-13T14:47:34Z"),
+        assertEquals(PageMessage.Seen(Instant.parse("2026-10-13T14:47:34Z").toEpochMilli(), "2026-10-13T14:47:34Z"),
             p("""{"type":"seen","at":"2026-10-13T14:47:34Z"}"""))
         assertNull(p("""{"type":"seen","at":"yesterday"}"""))
         assertNull(p("""{"type":"seen","at":12}"""))
@@ -116,9 +116,17 @@ class PolicyTest {
 
     @Test
     fun isoDates() {
-        assertEquals(Instant.parse("2026-10-13T14:47:34.251Z"), parseIsoDate("2026-10-13T14:47:34.251Z"))
-        assertEquals(Instant.parse("2026-10-13T12:47:34Z"), parseIsoDate("2026-10-13T14:47:34+02:00"))
-        assertNull(parseIsoDate("2026-10-13"))
-        assertNull(parseIsoDate(""))
+        fun ms(s: String) = Instant.parse(s).toEpochMilli()
+        assertEquals(ms("2026-10-13T14:47:34.251Z"), parseIsoDate("2026-10-13T14:47:34.251Z"))
+        assertEquals(ms("2026-10-13T14:47:34.251Z"), parseIsoDate("2026-10-13T14:47:34.251999Z"))
+        assertEquals(ms("2026-10-13T14:47:34.200Z"), parseIsoDate("2026-10-13T14:47:34.2Z"))
+        assertEquals(ms("2026-10-13T12:47:34Z"), parseIsoDate("2026-10-13T14:47:34+02:00"))
+        assertEquals(ms("2026-10-13T16:17:34Z"), parseIsoDate("2026-10-13T14:47:34-01:30"))
+        assertEquals(ms("1970-01-01T00:00:00Z"), parseIsoDate("1970-01-01T00:00:00Z"))
+        assertEquals(ms("2024-02-29T23:59:59Z"), parseIsoDate("2024-02-29T23:59:59z"))
+        for (bad in listOf("2026-10-13", "", "2026-13-01T00:00:00Z", "2026-02-30T00:00:00Z", "2026-10-13T24:00:00Z",
+            "2026-10-13T14:47:34", "2026-10-13 14:47:34Z", "x2026-10-13T14:47:34Z", "2026-10-13T14:47:34.Z")) {
+            assertNull(bad, parseIsoDate(bad))
+        }
     }
 }

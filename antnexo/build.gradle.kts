@@ -11,7 +11,11 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    lint { ignoreTestSources = true }
+    lint {
+        ignoreTestSources = true
+        // versions move in their own PRs, not as lint noise
+        disable += setOf("GradleDependency", "NewerVersionAvailable", "AndroidGradlePluginVersion")
+    }
     testOptions { unitTests { isIncludeAndroidResources = true } }
 }
 
