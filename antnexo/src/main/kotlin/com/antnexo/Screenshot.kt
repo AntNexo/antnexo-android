@@ -8,6 +8,8 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Base64
 import android.view.PixelCopy
+import androidx.core.graphics.createBitmap
+import androidx.core.graphics.scale
 import com.antnexo.core.fittedSize
 import java.io.ByteArrayOutputStream
 
@@ -17,7 +19,7 @@ internal fun jpegDataUrl(bitmap: Bitmap, max: Int = 1600): String? {
     return try {
         val size = fittedSize(bitmap.width, bitmap.height, max)
         val scaled = if (size.width == bitmap.width && size.height == bitmap.height) bitmap
-        else Bitmap.createScaledBitmap(bitmap, size.width, size.height, true)
+        else bitmap.scale(size.width, size.height)
         val out = ByteArrayOutputStream()
         val ok = scaled.compress(Bitmap.CompressFormat.JPEG, 70, out)
         if (scaled !== bitmap) scaled.recycle()
@@ -38,7 +40,7 @@ internal fun captureScreenshot(activity: Activity, done: (String?) -> Unit) {
     try {
         val decor = activity.window?.decorView
         if (decor == null || decor.width <= 0 || decor.height <= 0) return done(null)
-        val bitmap = Bitmap.createBitmap(decor.width, decor.height, Bitmap.Config.ARGB_8888)
+        val bitmap = createBitmap(decor.width, decor.height)
         if (Build.VERSION.SDK_INT >= 26) {
             PixelCopy.request(activity.window, bitmap, { result ->
                 val url = if (result == PixelCopy.SUCCESS) jpegDataUrl(bitmap) else null

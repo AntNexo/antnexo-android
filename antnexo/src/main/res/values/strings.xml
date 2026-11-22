@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="antnexo_done">Done</string>
+    <string name="antnexo_load_failed">Couldn’t load feedback.</string>
+    <string name="antnexo_try_again">Try again</string>
+    <string name="antnexo_outdated_webview">Couldn’t load feedback. Update Android System WebView and try again.</string>
+</resources>

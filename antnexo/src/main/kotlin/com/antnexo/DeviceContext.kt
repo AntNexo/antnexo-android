@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.os.Build
+import androidx.core.content.edit
 import com.antnexo.core.AppContext
 import com.antnexo.core.SeenStore
 import com.antnexo.core.bcp47
@@ -48,6 +49,6 @@ internal class PrefsSeenStore(context: Context) : SeenStore {
     override fun get(workspace: String): String? = prefs.getString("antnexo:$workspace:seen", null)
 
     override fun set(iso: String, workspace: String) {
-        prefs.edit().putString("antnexo:$workspace:seen", iso).apply()
+        prefs.edit { putString("antnexo:$workspace:seen", iso) }
     }
 }
