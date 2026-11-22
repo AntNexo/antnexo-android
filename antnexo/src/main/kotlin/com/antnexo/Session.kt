@@ -65,8 +65,10 @@ internal class Session(
         onEvent(AntNexoEvent.Closed)
     }
 
-    /** Closes the sheet from outside (logout): the activity finishes, which ends the session. */
+    /** Closes the sheet from outside (logout): the page stops now, the activity finishes, which ends the session. */
     fun close() {
+        // before anything else: the page must not write the board's storage after logout cleared it
+        controller?.tearDown()
         val a = activity?.get()
         if (a != null && !a.isFinishing) a.finish() else end()
     }

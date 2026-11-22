@@ -4,4 +4,4 @@ dependencyResolutionManagement {
     repositories { google(); mavenCentral() }
 }
 rootProject.name = "antnexo-android"
-include(":antnexo")
+include(":antnexo", ":antnexo-compose")
