@@ -34,6 +34,10 @@ import java.lang.ref.WeakReference
  * is Done. It attaches to [Sessions.current]; without one (the process was killed while it was open) it just finishes.
  */
 class FeedbackActivity : ComponentActivity() {
+    internal companion object {
+        const val EXTRA_SESSION = "com.antnexo.session"
+    }
+
     private var session: Session? = null
     private var controller: FeedbackController? = null
     internal var webView: WebView? = null
@@ -56,7 +60,9 @@ class FeedbackActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val s = Sessions.current
-        if (s == null || s.ended) {
+        val forSession = intent?.getStringExtra(EXTRA_SESSION)
+        // no session (the process died with the sheet open), or a late start meant for an older one
+        if (s == null || s.ended || (forSession != null && forSession != s.id)) {
             finish()
             return
         }
@@ -121,6 +127,10 @@ class FeedbackActivity : ComponentActivity() {
         root?.setBackgroundColor(colors.background)
         webView?.setBackgroundColor(colors.background)
         (doneButton as? TextView)?.setTextColor(colors.action)
+        failureView?.let {
+            hideFailure()
+            showFailure(controller?.outdatedWebView == true)
+        }
     }
 
     private fun applySystemBars() {
@@ -288,9 +298,12 @@ class FeedbackActivity : ComponentActivity() {
 
 /** A picker for every type the page accepts (`accept` values may hold several, comma-separated). */
 internal fun chooserIntent(acceptTypes: Array<String>?, multiple: Boolean): Intent {
-    val types = acceptTypes.orEmpty().flatMap { it.split(',') }.map { it.trim() }.filter { it.contains('/') }.distinct()
+    val all = acceptTypes.orEmpty().flatMap { it.split(',') }.map { it.trim() }.filter { it.isNotEmpty() }
+    val types = all.filter { it.contains('/') }.distinct()
     val i = Intent(Intent.ACTION_GET_CONTENT).addCategory(Intent.CATEGORY_OPENABLE)
     when {
+        // an extension (".pdf") we can't map reliably: offer everything rather than hide what the page takes
+        all.size != types.size -> return i.setType("*/*").also { if (multiple) it.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true) }
         types.isEmpty() -> i.type = "*/*"
         types.all { it.startsWith("image/") } -> i.type = "image/*"
         else -> i.type = "*/*"

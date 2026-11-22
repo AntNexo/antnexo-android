@@ -90,15 +90,18 @@ class ReviewFixTest {
         val prefs = MemoryWipe()
         val e = engine().apply { wipeStore = { prefs } }
         val activity = Robolectric.buildActivity(Activity::class.java).setup().get()
-        assertFalse(e.prepare(activity, null, false)!!.also { it.end() }.state.wipe)
+        assertNull(e.prepare(activity, null, false)!!.also { it.end() }.state.wipe)
         e.logout()
         val s = e.prepare(activity, null, false)!!
-        assertTrue(s.state.wipe)
-        assertTrue(com.antnexo.core.bridgeScript(s.state).startsWith("try{localStorage.clear();sessionStorage.clear()}catch(e){}"))
+        val nonce = s.state.wipe!!
+        assertTrue(nonce.length >= 16)
         // dropped only once a page has loaded with it
         s.wiped()
         s.end()
-        assertFalse(e.prepare(activity, null, false)!!.state.wipe)
+        assertNull(e.prepare(activity, null, false)!!.also { it.end() }.state.wipe)
+        // each logout has its own nonce
+        e.logout()
+        assertNotSame(nonce, e.prepare(activity, null, false)!!.state.wipe)
     }
 
     // the engine never stays "presenting" after a failure
@@ -213,6 +216,50 @@ class ReviewFixTest {
     // files: every accepted image type, several at once, and only content the person picked
 
     @Test
+    fun aDeadRenderersWebViewIsNeverCalledAgain() {
+        val t = TestSession()
+        val c = FeedbackController(t.session)
+        val w = android.webkit.WebView(app)
+        c.attach(w)
+        c.load()
+        c.renderProcessGone()
+        c.tearDown()
+        // no about:blank, no bridge removal on the dead WebView: only destroy() is allowed
+        assertEquals(splynxPage, shadowOf(w).lastLoadedUrl)
+        assertEquals(0, t.bridge.removed)
+    }
+
+    @Test
+    fun aLateSheetForAnOldSessionDoesNotTakeOverTheNewOne() {
+        val old = TestSession()
+        val current = TestSession()
+        Sessions.current = current.session
+        val intent = Intent(app, FeedbackActivity::class.java).putExtra(FeedbackActivity.EXTRA_SESSION, old.session.id)
+        val c = Robolectric.buildActivity(FeedbackActivity::class.java, intent).setup()
+        assertTrue(c.get().isFinishing)
+        assertNull(current.session.controller)
+        c.destroy()
+        assertTrue(current.events.isEmpty())
+    }
+
+    @Test
+    fun theFailureViewFollowsDarkMode() {
+        val t = TestSession()
+        Sessions.current = t.session
+        val c = Robolectric.buildActivity(FeedbackActivity::class.java).setup()
+        val a = c.get()
+        t.session.controller!!.httpError(mainFrame = true, status = 500)
+        val before = a.failureView
+        val cfg = android.content.res.Configuration(a.resources.configuration)
+        cfg.uiMode = (cfg.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK.inv()) or
+            android.content.res.Configuration.UI_MODE_NIGHT_YES
+        org.robolectric.RuntimeEnvironment.setQualifiers("night")
+        c.configurationChange(cfg)
+        assertNotNull(a.failureView)
+        assertNotSame(before, a.failureView)
+    }
+
+    @Test
     fun theChooserAsksForEveryAcceptedType() {
         val i = chooserIntent(arrayOf("image/png", "image/jpeg,image/webp", "image/gif"), multiple = true)
         assertEquals(Intent.ACTION_GET_CONTENT, i.action)
@@ -221,6 +268,8 @@ class ReviewFixTest {
         assertEquals(listOf("image/png", "image/jpeg", "image/webp", "image/gif"), i.getStringArrayExtra(Intent.EXTRA_MIME_TYPES)!!.toList())
         assertTrue(i.getBooleanExtra(Intent.EXTRA_ALLOW_MULTIPLE, false))
         assertEquals("*/*", chooserIntent(arrayOf(""), multiple = false).type)
+        // an extension in accept: anything, rather than hiding what the page takes
+        assertEquals("*/*", chooserIntent(arrayOf("image/png,.pdf"), multiple = false).type)
     }
 
     @Test
@@ -300,13 +349,13 @@ class ReviewFixTest {
 
 /** In-memory wipe flags. */
 internal class MemoryWipe : WipeStore {
-    private val set = mutableSetOf<String>()
-    override fun pending(origin: String) = origin in set
-    override fun mark(origin: String) {
-        set += origin
+    private val map = mutableMapOf<String, String>()
+    override fun pending(origin: String) = map[origin]
+    override fun mark(origin: String, nonce: String) {
+        map[origin] = nonce
     }
 
-    override fun done(origin: String) {
-        set -= origin
+    override fun done(origin: String, nonce: String) {
+        if (map[origin] == nonce) map -= origin
     }
 }

@@ -109,6 +109,8 @@ internal class FeedbackController(private val session: Session) {
         onLoaded = null
         onFileChooser = null
         val w = web ?: return
+        // a WebView whose renderer died may only be removed and destroyed (the activity does that)
+        if (rendererGone) return
         w.stopLoading()
         if (!outdatedWebView) session.deps.bridge.remove(w)
         w.webViewClient = Closed

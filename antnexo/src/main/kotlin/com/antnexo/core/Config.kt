@@ -82,9 +82,15 @@ class BoardHost private constructor(
 
         internal fun defaultPort(scheme: String) = if (scheme == "https") 443 else 80
 
-        /** A host for local development: this machine, or the host machine as the Android emulator sees it. */
+        private val loopback4 = Regex("^127\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}$")
+
+        /**
+         * A host for local development: this machine (localhost, *.localhost, 127/8, ::1), or the host machine as an
+         * emulator sees it (Android emulator 10.0.2.2, Genymotion 10.0.3.2).
+         */
         private fun isLocal(host: String) =
-            host == "localhost" || host.endsWith(".localhost") || host == "127.0.0.1" || host == "10.0.2.2"
+            host == "localhost" || host.endsWith(".localhost") || loopback4.matches(host) || host == "[::1]" ||
+                host == "::1" || host == "10.0.2.2" || host == "10.0.3.2"
     }
 }
 

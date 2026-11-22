@@ -62,9 +62,12 @@ internal class Session(
     var ended = false
         private set
 
+    /** Tells a late FeedbackActivity started for an older session from this one. */
+    val id: String = java.util.UUID.randomUUID().toString()
+
     /** A page carrying the wipe loaded: later openings needn't wipe again. */
     fun wiped() {
-        if (state.wipe) onWiped()
+        if (state.wipe != null) onWiped()
     }
 
     /** Ends the session once: the page stops, the app hears Closed. */

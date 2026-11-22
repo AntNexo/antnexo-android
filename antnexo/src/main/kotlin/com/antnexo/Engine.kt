@@ -37,21 +37,26 @@ fun interface TokenProvider {
 
 /** Boards whose storage the next opening must clear (set by logout). */
 internal interface WipeStore {
-    fun pending(origin: String): Boolean
+    /** The nonce of a logout whose wipe hasn't happened yet. */
+    fun pending(origin: String): String?
 
-    fun mark(origin: String)
+    fun mark(origin: String, nonce: String)
 
-    fun done(origin: String)
+    /** Done, unless a newer logout came meanwhile. */
+    fun done(origin: String, nonce: String)
 }
 
 internal class PrefsWipeStore(context: Context) : WipeStore {
     private val prefs = context.applicationContext.getSharedPreferences("antnexo", Context.MODE_PRIVATE)
 
-    override fun pending(origin: String) = prefs.getBoolean("antnexo:wipe:$origin", false)
+    override fun pending(origin: String) = prefs.getString("antnexo:wipe:$origin", null)
 
-    override fun mark(origin: String) = prefs.edit { putBoolean("antnexo:wipe:$origin", true) }
+    // commit: a process killed right after logout must still wipe on the next opening
+    override fun mark(origin: String, nonce: String) = prefs.edit(commit = true) { putString("antnexo:wipe:$origin", nonce) }
 
-    override fun done(origin: String) = prefs.edit { remove("antnexo:wipe:$origin") }
+    override fun done(origin: String, nonce: String) {
+        if (pending(origin) == nonce) prefs.edit(commit = true) { remove("antnexo:wipe:$origin") }
+    }
 }
 
 /** The SDK's state behind the [AntNexo] facade, with seams for tests. Main thread, except where noted. */
@@ -81,7 +86,8 @@ internal class Engine {
     val listeners = mutableListOf<(AntNexoEvent) -> Unit>()
 
     /** A sheet is up or being prepared: one at a time. Lives only in memory, so a new process starts free. */
-    private var presenting = false
+    var presenting = false
+        private set
 
     /** Bumped by close() and logout(): a sheet still being prepared from before is dropped. */
     private var generation = 0
@@ -129,8 +135,8 @@ internal class Engine {
             val store = seenStore(c.app)
             val wipes = wipeStore(c.app)
             val origin = c.host.origin
-            val state = NativeState(BridgePlatform.ANDROID, context(activity), token, store.get(c.workspace), shot,
-                wipe = wipes.pending(origin))
+            val wipe = wipes.pending(origin)
+            val state = NativeState(BridgePlatform.ANDROID, context(activity), token, store.get(c.workspace), shot, wipe)
             return Session(
                 host = c.host, workspace = c.workspace, page = appPageUrl(c.host, c.workspace, options), state = state,
                 options = options, seenStore = store, onEvent = ::dispatch,
@@ -139,7 +145,7 @@ internal class Engine {
                     onClosed?.invoke()
                 },
                 deps = deps,
-                onWiped = { wipes.done(origin) },
+                onWiped = { if (wipe != null) wipes.done(origin, wipe) },
             )
         } catch (e: Throwable) {
             presenting = false
@@ -183,7 +189,7 @@ internal class Engine {
             }
             Sessions.current = s
             try {
-                activity.startActivity(Intent(activity, FeedbackActivity::class.java))
+                activity.startActivity(Intent(activity, FeedbackActivity::class.java).putExtra(FeedbackActivity.EXTRA_SESSION, s.id))
             } catch (e: RuntimeException) {
                 Log.e(TAG, "AntNexo.show(): couldn't start the sheet", e)
                 Sessions.current = null
@@ -227,7 +233,7 @@ internal class Engine {
         val c = configuration ?: return
         generation++
         // the next page clears the board's storage before the widget reads it (deleteOrigin leaves localStorage)
-        wipeStore(c.app).mark(c.host.origin)
+        wipeStore(c.app).mark(c.host.origin, java.util.UUID.randomUUID().toString())
         // an open page keeps its session in memory: close it first
         Sessions.current?.close()
         clearData(c.host)

@@ -73,6 +73,10 @@ object AntNexo {
         engine.listeners -= listener
     }
 
+    /** Whether a sheet is open or opening. */
+    @JvmStatic
+    val isShowing: Boolean get() = engine.presenting
+
     /** Closes the sheet if one is open, or drops one still being prepared. */
     @JvmStatic
     fun close() {
