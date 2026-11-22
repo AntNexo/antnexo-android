@@ -41,9 +41,10 @@ dependencies {
 publishing {
     publications {
         register<MavenPublication>("release") {
-            groupId = "com.antnexo"
+            // JitPack sets GROUP (com.github.AntNexo.antnexo-android) and VERSION (the tag); Maven Central uses ours
+            groupId = System.getenv("GROUP") ?: "com.antnexo"
             artifactId = "antnexo-android"
-            version = com.antnexo.build.SDK_VERSION
+            version = System.getenv("VERSION") ?: rootProject.extra["sdkVersion"] as String
             afterEvaluate { from(components["release"]) }
             pom {
                 name.set("antnexo-android")

@@ -26,12 +26,15 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,10 +43,12 @@ import com.antnexo.AntNexo
 import com.antnexo.AntNexoEvent
 import com.antnexo.TokenProvider
 import com.antnexo.compose.AntNexoSheet
+import com.antnexo.core.AntNexoException
 import com.antnexo.core.FeedbackOptions
 import com.antnexo.core.FeedbackTab
 import com.antnexo.core.FeedbackTheme
 import kotlinx.coroutines.launch
+import java.io.IOException
 
 /** One screen to try every part of the SDK. */
 class MainActivity : ComponentActivity() {
@@ -53,7 +58,10 @@ class MainActivity : ComponentActivity() {
         // `adb shell am start -n com.antnexo.sample/.MainActivity --es host http://acme.localhost:8090 --es workspace acme`
         val host = intent.getStringExtra("host")
         val workspace = intent.getStringExtra("workspace")
-        if (host != null && workspace != null) AntNexo.configure(this, host, workspace)
+        if (host != null && workspace != null) {
+            runCatching { AntNexo.configure(this, host, workspace) }
+                .onFailure { Log.e("AntNexoSample", "can't use $host / $workspace: ${it.message}") }
+        }
         // scripted checks: `--es identify <jwt>` (a token your backend signed; the sample never holds the secret)
         val launchToken = intent.getStringExtra("identify")
         setContent {
@@ -69,27 +77,36 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun Screen(host: String, workspace: String, launchToken: String?) {
     val scope = rememberCoroutineScope()
-    var feedback by remember { mutableStateOf(false) }
-    var roadmap by remember { mutableStateOf(false) }
-    var withScreenshot by remember { mutableStateOf(false) }
-    var whatsNew by remember { mutableStateOf(false) }
-    var unread by remember { mutableIntStateOf(0) }
-    var theme by remember { mutableStateOf<FeedbackTheme?>(null) }
-    var identify by remember { mutableStateOf(launchToken != null) }
-    var token by remember { mutableStateOf(launchToken ?: "") }
+    var feedback by rememberSaveable { mutableStateOf(false) }
+    var roadmap by rememberSaveable { mutableStateOf(false) }
+    var withScreenshot by rememberSaveable { mutableStateOf(false) }
+    var whatsNew by rememberSaveable { mutableStateOf(false) }
+    var unread by rememberSaveable { mutableIntStateOf(0) }
+    var theme by rememberSaveable { mutableStateOf<FeedbackTheme?>(null) }
+    var identify by rememberSaveable { mutableStateOf(launchToken != null) }
+    var token by rememberSaveable { mutableStateOf(launchToken ?: "") }
     val context = androidx.compose.ui.platform.LocalContext.current
 
     suspend fun refresh() {
-        unread = runCatching { AntNexo.unreadCount() }.onFailure { Log.w("AntNexoSample", "unread: $it") }.getOrDefault(0)
-    }
-    LaunchedEffect(Unit) {
-        if (launchToken != null) AntNexo.identify { token.trim().ifEmpty { null } }
-        AntNexo.onEvent = { e ->
-            Log.i("AntNexoSample", "event: $e")
-            if (e is AntNexoEvent.Unread) unread = e.count
+        try {
+            unread = AntNexo.unreadCount()
+        } catch (e: IOException) {
+            Log.w("AntNexoSample", "unread: $e")
+        } catch (e: AntNexoException) {
+            Log.w("AntNexoSample", "unread: $e")
         }
-        refresh()
     }
+    // the token lives in this screen's saved state; the provider reads the current value
+    val currentToken by rememberUpdatedState(token)
+    LaunchedEffect(identify) {
+        AntNexo.identify(if (identify) TokenProvider { currentToken.trim().ifEmpty { null } } else null)
+    }
+    DisposableEffect(Unit) {
+        val listener: (AntNexoEvent) -> Unit = { e -> if (e is AntNexoEvent.Unread) unread = e.count }
+        AntNexo.addEventListener(listener)
+        onDispose { AntNexo.removeEventListener(listener) }
+    }
+    LaunchedEffect(Unit) { refresh() }
 
     Column(
         Modifier.safeDrawingPadding().padding(24.dp).fillMaxWidth(),
@@ -107,16 +124,13 @@ private fun Screen(host: String, workspace: String, launchToken: String?) {
             for ((label, t) in listOf("System" to null, "Light" to FeedbackTheme.LIGHT, "Dark" to FeedbackTheme.DARK)) {
                 FilterChip(selected = theme == t, onClick = {
                     theme = t
-                    AntNexo.configure(context, host, workspace, FeedbackOptions(theme = t))
+                    runCatching { AntNexo.configure(context, host, workspace, FeedbackOptions(theme = t)) }
                 }, label = { Text(label) })
             }
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Switch(checked = identify, onCheckedChange = {
-                identify = it
-                // a token your backend signed; the sample never holds the identify secret
-                AntNexo.identify(if (it) TokenProvider { token.trim().ifEmpty { null } } else null)
-            })
+            // a token your backend signed; the sample never holds the identify secret
+            Switch(checked = identify, onCheckedChange = { identify = it })
             Text("Identify with a pasted token")
         }
         if (identify) OutlinedTextField(token, { token = it }, Modifier.fillMaxWidth(), label = { Text("Identify token (JWT)") })

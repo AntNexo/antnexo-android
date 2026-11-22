@@ -259,6 +259,8 @@ class FeedbackActivity : ComponentActivity() {
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
                 typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
                 setPadding(dp(16), dp(12), dp(16), dp(12))
+                minimumHeight = dp(48)
+                gravity = Gravity.CENTER
                 isClickable = true
                 setOnClickListener { retry() }
             }, wrap())
