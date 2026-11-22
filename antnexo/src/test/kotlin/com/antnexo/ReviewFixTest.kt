@@ -241,6 +241,23 @@ class ReviewFixTest {
     }
 
     @Test
+    fun switchingToDarkRecolorsTheBarsWithoutReloading() {
+        val t = TestSession()
+        Sessions.current = t.session
+        val c = Robolectric.buildActivity(FeedbackActivity::class.java).setup()
+        val a = c.get()
+        val ctl = t.session.controller
+        val cfg = android.content.res.Configuration(a.resources.configuration)
+        cfg.uiMode = (cfg.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK.inv()) or
+            android.content.res.Configuration.UI_MODE_NIGHT_YES
+        org.robolectric.RuntimeEnvironment.setQualifiers("night")
+        c.configurationChange(cfg)
+        assertTrue(ctl === t.session.controller)
+        assertEquals(android.graphics.Color.WHITE, (a.doneButton as android.widget.TextView).currentTextColor)
+        // the status-bar icons: Robolectric doesn't keep their appearance; checked on the emulator (API 36)
+    }
+
+    @Test
     fun tryAgainAfterADeadRendererUsesANewWebView() {
         val t = TestSession()
         Sessions.current = t.session

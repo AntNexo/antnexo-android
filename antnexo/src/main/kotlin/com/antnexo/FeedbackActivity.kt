@@ -24,6 +24,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.graphics.toColorInt
 import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import com.antnexo.core.FeedbackTheme
 import java.lang.ref.WeakReference
@@ -126,6 +127,16 @@ class FeedbackActivity : ComponentActivity() {
         val bar = if (colors.dark) SystemBarStyle.dark(Color.TRANSPARENT)
         else SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
         enableEdgeToEdge(statusBarStyle = bar, navigationBarStyle = bar)
+        setBarIcons()
+        // on a dark mode switch the system re-applies the window's own appearance after onConfigurationChanged
+        window.decorView.post { setBarIcons() }
+    }
+
+    private fun setBarIcons() {
+        WindowCompat.getInsetsController(window, window.decorView).apply {
+            isAppearanceLightStatusBars = !colors.dark
+            isAppearanceLightNavigationBars = !colors.dark
+        }
     }
 
     override fun onDestroy() {
