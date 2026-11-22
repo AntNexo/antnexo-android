@@ -33,9 +33,9 @@ and in your app's `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("com.github.AntNexo.antnexo-android:antnexo-android-compose:v1.0.0") // Compose (includes the core)
+    implementation("com.github.AntNexo.antnexo-android:antnexo-android-compose:v1.1.0") // Compose (includes the core)
     // or, for Views only:
-    implementation("com.github.AntNexo.antnexo-android:antnexo-android:v1.0.0")
+    implementation("com.github.AntNexo.antnexo-android:antnexo-android:v1.1.0")
 }
 ```
 
@@ -175,6 +175,8 @@ but `INTERNET`.
 - If the page can't load (offline), the sheet says so and offers Try again.
 - A renamed workspace slug changes the host: ship the new one in an update.
 - R8/ProGuard: no rules needed.
+- Wrappers of this library (the React Native SDK) set the platform and SDK version the page reports through
+  `AntNexo.setWrapper` (opt-in `@AntNexoWrapperApi`); apps don't call it.
 
 ## Sample app
 

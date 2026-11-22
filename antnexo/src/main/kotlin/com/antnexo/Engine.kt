@@ -12,6 +12,7 @@ import com.antnexo.core.AntNexoException
 import com.antnexo.core.AppContext
 import com.antnexo.core.BoardHost
 import com.antnexo.core.BridgePlatform
+import com.antnexo.core.SDK_VERSION
 import com.antnexo.core.ChangelogClient
 import com.antnexo.core.FeedbackOptions
 import com.antnexo.core.FeedbackTab
@@ -68,6 +69,9 @@ internal class Engine {
     var tokenProvider: TokenProvider? = null
     var onEvent: ((AntNexoEvent) -> Unit)? = null
     var identifyTimeoutMs = 10_000L
+
+    /** Set by a wrapper (React Native): the platform and SDK version the page reports instead of this library's. */
+    var wrapper: Pair<BridgePlatform, String>? = null
 
     /** How long FeedbackActivity has to attach before the sheet counts as never opened (a blocked start). */
     var attachTimeoutMs = 5_000L
@@ -136,7 +140,8 @@ internal class Engine {
             val wipes = wipeStore(c.app)
             val origin = c.host.origin
             val wipe = wipes.pending(origin)
-            val state = NativeState(BridgePlatform.ANDROID, context(activity), token, store.get(c.workspace), shot, wipe)
+            val state = NativeState(wrapper?.first ?: BridgePlatform.ANDROID, context(activity), token, store.get(c.workspace), shot,
+                wipe, sdk = wrapper?.second ?: SDK_VERSION)
             return Session(
                 host = c.host, workspace = c.workspace, page = appPageUrl(c.host, c.workspace, options), state = state,
                 options = options, seenStore = store, onEvent = ::dispatch,

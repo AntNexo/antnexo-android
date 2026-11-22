@@ -2,6 +2,7 @@ package com.antnexo
 
 import android.app.Activity
 import android.content.Context
+import com.antnexo.core.BridgePlatform
 import com.antnexo.core.FeedbackOptions
 import com.antnexo.core.FeedbackTab
 import kotlinx.coroutines.Dispatchers
@@ -17,6 +18,15 @@ import kotlinx.coroutines.withContext
  */
 object AntNexo {
     private val engine get() = Engine.shared
+
+    /**
+     * For wrappers of this library (the React Native SDK): the platform and SDK version the page reports. Not for apps.
+     */
+    @AntNexoWrapperApi
+    @JvmStatic
+    fun setWrapper(platform: BridgePlatform, sdk: String) {
+        engine.wrapper = platform to sdk
+    }
 
     /**
      * Once, at launch. `host` is the workspace's board host: `https://<slug>.antnexo.com` (recommended: it works on
