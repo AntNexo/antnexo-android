@@ -1,0 +1,117 @@
+package com.antnexo.core
+
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.booleanOrNull
+import java.net.URI
+import java.net.URISyntaxException
+import java.time.Instant
+import java.time.OffsetDateTime
+import java.time.format.DateTimeParseException
+import java.util.Locale
+
+/** A message from the page (`AntNexoApp.post`), after validation. Anything else is ignored. */
+sealed interface PageMessage {
+    data object Ready : PageMessage
+
+    /** A link to open in the browser (http(s) only). */
+    data class Open(val url: String) : PageMessage
+
+    /** The board's own OAuth start URL, to open in the system's sign-in browser. */
+    data class Auth(val url: String) : PageMessage
+
+    /** The person saw What's new up to this entry. */
+    data class Seen(val at: Instant, val raw: String) : PageMessage
+
+    data class Unread(val count: Int) : PageMessage
+
+    data class Session(val signedIn: Boolean) : PageMessage
+
+    data class IdentifyFailed(val code: String) : PageMessage
+
+    data class Posted(val id: String) : PageMessage
+}
+
+/** Messages are a few hundred bytes; anything bigger isn't one of ours. */
+private const val MAX_MESSAGE = 64 * 1024
+
+private val oauthPath = Regex("^/api/v1/public/oauth/[a-z0-9_-]{1,32}/start$")
+private val uuid = Regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
+private val wholeNumber = Regex("^-?\\d{1,9}$")
+
+/**
+ * Parses and validates a page message (the JSON string `AntNexoApp.post` sent). The caller has already checked that it
+ * came from the main frame on the board host. null: ignore it.
+ */
+fun parsePageMessage(data: String?, host: BoardHost): PageMessage? {
+    if (data == null || data.length > MAX_MESSAGE) return null
+    val m = try {
+        Json.parseToJsonElement(data) as? JsonObject
+    } catch (e: IllegalArgumentException) {
+        null
+    } ?: return null
+    return when (m.string("type")) {
+        "ready" -> PageMessage.Ready
+        "open" -> m.string("url")?.takeIf(::isWebUrl)?.let { PageMessage.Open(it) }
+        "auth" -> m.string("url")?.takeIf { isWebUrl(it) && isOAuthStart(it, host) }?.let { PageMessage.Auth(it) }
+        "seen" -> m.string("at")?.takeIf { it.length <= 64 }?.let { s -> parseIsoDate(s)?.let { PageMessage.Seen(it, s) } }
+        "unread" -> m.int("count")?.takeIf { it in 0..999 }?.let { PageMessage.Unread(it) }
+        "session" -> (m["signed_in"] as? JsonPrimitive)?.takeIf { !it.isString }?.booleanOrNull?.let { PageMessage.Session(it) }
+        "identify_failed" -> m.string("code")?.let { PageMessage.IdentifyFailed(it.take(64)) }
+        "posted" -> m.string("id")?.takeIf { uuid.matches(it) }?.let { PageMessage.Posted(it) }
+        else -> null
+    }
+}
+
+private fun JsonObject.string(key: String): String? = (this[key] as? JsonPrimitive)?.takeIf { it.isString }?.content
+
+/** A JS integer: a number literal with no fraction or exponent (not a string, not a boolean). */
+private fun JsonObject.int(key: String): Int? {
+    val p = this[key] as? JsonPrimitive ?: return null
+    if (p.isString || !wholeNumber.matches(p.content)) return null
+    return p.content.toIntOrNull()
+}
+
+/** An http(s) URL with a host. */
+internal fun isWebUrl(s: String): Boolean {
+    val u = uri(s) ?: return false
+    val scheme = u.scheme?.lowercase(Locale.ROOT)
+    return (scheme == "https" || scheme == "http") && !u.host.isNullOrEmpty()
+}
+
+/** Whether u is the board's own `/api/v1/public/oauth/<provider>/start` (the path compared as sent, still encoded). */
+internal fun isOAuthStart(s: String, host: BoardHost): Boolean {
+    val u = uri(s) ?: return false
+    if (u.rawUserInfo != null) return false
+    val h = asciiHost(u.host) ?: return false
+    if (!host.matches(u.scheme ?: return false, h, u.port)) return false
+    return oauthPath.matches(u.rawPath ?: return false)
+}
+
+private fun uri(s: String): URI? = try {
+    URI(s)
+} catch (e: URISyntaxException) {
+    null
+}
+
+/** An ISO 8601 date-time with an offset, with or without fractional seconds. */
+fun parseIsoDate(s: String): Instant? = try {
+    OffsetDateTime.parse(s).toInstant()
+} catch (e: DateTimeParseException) {
+    null
+}
+
+/**
+ * Lets through only the first load of the app page in the main frame: every later navigation (a link, a redirect, a
+ * history step) is refused, and so is anything in a subframe.
+ */
+class NavigationGate(private val page: String) {
+    private var loaded = false
+
+    fun allow(url: String, mainFrame: Boolean): Boolean {
+        if (!mainFrame || loaded || url != page) return false
+        loaded = true
+        return true
+    }
+}
