@@ -104,6 +104,17 @@ class FeedbackActivityTest {
     }
 
     @Test
+    fun tryAgainIsCentred() {
+        val a = open().get()
+        t.session.controller!!.httpError(mainFrame = true, status = 500)
+        val box = a.failureView as android.widget.LinearLayout
+        for (i in 0 until box.childCount) {
+            val v = box.getChildAt(i)
+            assertEquals(android.view.ViewGroup.LayoutParams.WRAP_CONTENT, v.layoutParams.width)
+        }
+    }
+
+    @Test
     fun anOutdatedWebViewSaysSo() {
         t.bridge.isSupported = false
         val a = open().get()
