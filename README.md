@@ -86,7 +86,7 @@ AntNexo.configure(this, "https://acme.antnexo.com", "acme", FeedbackOptions(
 ## Sign the person in from your app (identify)
 
 If your app has its own accounts, sign the person in to the board as themselves: your **backend** signs a short-lived
-HS256 JWT with the workspace's identify secret (admin → workspace settings → Widget → Identify secret) — `sub`,
+HS256 JWT with the workspace's identify secret (admin → Settings → Board, the Widget card → Identify secret) — `sub`,
 `email`, `exp` (≤ 24 h), optionally `name`, `company`, `mrr` — and the app fetches it when the sheet opens:
 
 ```kotlin
